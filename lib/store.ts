@@ -38,6 +38,7 @@ export interface HistoryTicket {
   arquivo_nome_exibicao?: string;
   arquivo_tamanhos?: string;
   resolucao?: string;
+  tecnico?: string;
 }
 
 // Keep store in global scope to survive Next.js dev server hot reloads

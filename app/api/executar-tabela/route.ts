@@ -287,6 +287,7 @@ async function processTickets(jobId: string, chamados: any[], tecnico?: string) 
           arquivo_nome_exibicao: chamado.arquivo_nome_exibicao,
           arquivo_tamanhos: chamado.arquivo_tamanhos,
           resolucao: chamado.resolucao,
+          tecnico: tecnico || 'Sistema',
         };
         ticketHistory.push(hist);
 
@@ -314,6 +315,7 @@ async function processTickets(jobId: string, chamados: any[], tecnico?: string) 
           arquivo_nome_exibicao: chamado.arquivo_nome_exibicao,
           arquivo_tamanhos: chamado.arquivo_tamanhos,
           resolucao: chamado.resolucao,
+          tecnico: tecnico || 'Sistema',
         };
         ticketHistory.push(hist);
       }
@@ -367,6 +369,7 @@ async function processTickets(jobId: string, chamados: any[], tecnico?: string) 
         arquivo_nome_exibicao: chamado.arquivo_nome_exibicao,
         arquivo_tamanhos: chamado.arquivo_tamanhos,
         resolucao: chamado.resolucao,
+        tecnico: tecnico || 'Sistema',
       };
       ticketHistory.push(hist);
     }

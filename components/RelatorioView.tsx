@@ -32,6 +32,7 @@ interface HistoryTicket {
   arquivo_nome_exibicao?: string;
   arquivo_tamanhos?: string;
   resolucao?: string;
+  tecnico?: string;
 }
 
 interface RelatorioViewProps {
@@ -69,6 +70,7 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
   const [selectedQueue, setSelectedQueue] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedDemandType, setSelectedDemandType] = useState('all');
+  const [selectedTechnician, setSelectedTechnician] = useState('all');
 
   // Expanded row state (for detailed tickets)
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -109,17 +111,20 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
     const clients = new Set<string>();
     const queues = new Set<string>();
     const demandTypes = new Set<string>();
+    const technicians = new Set<string>();
 
     tickets.forEach(t => {
       if (t.cliente) clients.add(t.cliente);
       if (t.fila) queues.add(t.fila);
       if (t.tipo_demanda) demandTypes.add(t.tipo_demanda);
+      if (t.tecnico) technicians.add(t.tecnico);
     });
 
     return {
       clients: Array.from(clients).sort(),
       queues: Array.from(queues).sort(),
-      demandTypes: Array.from(demandTypes).sort()
+      demandTypes: Array.from(demandTypes).sort(),
+      technicians: Array.from(technicians).sort()
     };
   }, [tickets]);
 
@@ -160,6 +165,9 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
       // Demand Type filter
       if (selectedDemandType !== 'all' && ticket.tipo_demanda !== selectedDemandType) return false;
 
+      // Technician filter
+      if (selectedTechnician !== 'all' && ticket.tecnico !== selectedTechnician) return false;
+
       // Date range filter
       if (dateRangePreset !== 'all') {
         const ticketDate = parsePtBrDate(ticket.data);
@@ -192,7 +200,7 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
 
       return true;
     });
-  }, [tickets, searchQuery, selectedClient, selectedQueue, selectedStatus, selectedDemandType, dateRangePreset, startDate, endDate, userRole]);
+  }, [tickets, searchQuery, selectedClient, selectedQueue, selectedStatus, selectedDemandType, selectedTechnician, dateRangePreset, startDate, endDate, userRole]);
 
   // Calculations for Dashboard Metrics (KPIs)
   const stats = useMemo(() => {
@@ -375,7 +383,7 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
             <span className="text-xs font-bold text-[var(--text-main)] flex items-center gap-1.5">
               <Filter size={13} className="text-[#89b4fa]" /> Filtros de Relatório
             </span>
-            {searchQuery || selectedClient !== 'all' || selectedQueue !== 'all' || selectedStatus !== 'all' || dateRangePreset !== 'all' || selectedDemandType !== 'all' ? (
+            {searchQuery || selectedClient !== 'all' || selectedQueue !== 'all' || selectedStatus !== 'all' || dateRangePreset !== 'all' || selectedDemandType !== 'all' || selectedTechnician !== 'all' ? (
               <button
                 onClick={() => {
                   setSearchQuery('');
@@ -383,6 +391,7 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
                   setSelectedQueue('all');
                   setSelectedStatus('all');
                   setSelectedDemandType('all');
+                  setSelectedTechnician('all');
                   setDateRangePreset('all');
                   setStartDate('');
                   setEndDate('');
@@ -394,7 +403,7 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
             ) : null}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
             {/* Search Input */}
             <div className="flex flex-col gap-1 sm:col-span-2">
               <label className="text-[10px] font-semibold text-[var(--status-text)]">Termo de busca</label>
@@ -481,6 +490,21 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
                 <option value="all">Todos os Tipos</option>
                 {filterOptions.demandTypes.map(dt => (
                   <option key={dt} value={dt}>{dt}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Technician Filter */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold text-[var(--status-text)]">Técnico</label>
+              <select
+                value={selectedTechnician}
+                onChange={(e) => setSelectedTechnician(e.target.value)}
+                className="w-full bg-[var(--bg-body)] border border-[var(--border-color)]/40 rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-main)] outline-none cursor-pointer focus:border-[#89b4fa]/40 transition"
+              >
+                <option value="all">Todos os Técnicos</option>
+                {filterOptions.technicians.map(tech => (
+                  <option key={tech} value={tech}>{tech}</option>
                 ))}
               </select>
             </div>
