@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import RelatorioView from '@/components/RelatorioView';
 import { 
@@ -308,14 +308,39 @@ export default function Home() {
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [totalHistory, setTotalHistory] = useState(0);
 
-  const filteredHistoryItems = historyItems.filter((item) => {
-    if (!historySearchQuery.trim()) return true;
-    const query = historySearchQuery.toLowerCase();
-    const matchAssunto = (item.assunto || '').toLowerCase().includes(query);
-    const matchDescricao = (item.descricao || '').toLowerCase().includes(query);
-    const matchDetalhes = (item.detalhes || '').toLowerCase().includes(query);
-    return matchAssunto || matchDescricao || matchDetalhes;
-  });
+  const filteredHistoryItems = useMemo(() => {
+    // Organize in descending chronological order (newest first)
+    const sorted = [...historyItems].sort((a, b) => {
+      try {
+        const parseDate = (dStr: string) => {
+          const [datePart, timePart] = dStr.split(/[,\s]+/);
+          const [day, month, year] = datePart.split('/').map(Number);
+          if (timePart) {
+            const [hour, minute, second] = timePart.split(':').map(Number);
+            return new Date(year, month - 1, day, hour, minute, second || 0).getTime();
+          }
+          return new Date(year, month - 1, day).getTime();
+        };
+        const dateB = parseDate(b.data);
+        const dateA = parseDate(a.data);
+        return dateB - dateA;
+      } catch (e) {
+        return (b.id || '').localeCompare(a.id || '');
+      }
+    });
+
+    if (!historySearchQuery.trim()) return sorted;
+    const query = historySearchQuery.toLowerCase().trim();
+    return sorted.filter((item) => {
+      const matchId = (item.id || '').toLowerCase().includes(query);
+      const matchCliente = (item.cliente || '').toLowerCase().includes(query);
+      const matchCatalogo = (item.catalogo || '').toLowerCase().includes(query);
+      const matchAssunto = (item.assunto || '').toLowerCase().includes(query);
+      const matchDescricao = (item.descricao || '').toLowerCase().includes(query);
+      const matchDetalhes = (item.detalhes || '').toLowerCase().includes(query);
+      return matchId || matchCliente || matchCatalogo || matchAssunto || matchDescricao || matchDetalhes;
+    });
+  }, [historyItems, historySearchQuery]);
 
   // Lists for autocomplete datalists
   const [clientList, setClientList] = useState<{ abreviatura: string; nome_completo: string }[]>([]);
@@ -1741,10 +1766,10 @@ export default function Home() {
     const activeRows = rows.filter((r) => {
       const isSelected = r.selected !== false;
       const isNotBlank = (
-        r.cliente.trim() !== '' ||
-        r.catalogo.trim() !== '' ||
-        r.assunto.trim() !== '' ||
-        r.descricao.trim() !== ''
+        (r.cliente || '').trim() !== '' ||
+        (r.catalogo || '').trim() !== '' ||
+        (r.assunto || '').trim() !== '' ||
+        (r.descricao || '').trim() !== ''
       );
       return isSelected && isNotBlank;
     });
@@ -1764,10 +1789,10 @@ export default function Home() {
       }
 
       const invalids: string[] = [];
-      if (!r.cliente.trim()) invalids.push('cliente');
-      if (!r.catalogo.trim()) invalids.push('catalogo');
-      if (!r.assunto.trim()) invalids.push('assunto');
-      if (!r.descricao.trim()) invalids.push('descricao');
+      if (!(r.cliente || '').trim()) invalids.push('cliente');
+      if (!(r.catalogo || '').trim()) invalids.push('catalogo');
+      if (!(r.assunto || '').trim()) invalids.push('assunto');
+      if (!(r.descricao || '').trim()) invalids.push('descricao');
 
       if (atendimento === 'ubs' || atendimento === 'manaus') {
         if (!r.fila?.trim()) invalids.push('fila');
@@ -2000,10 +2025,10 @@ export default function Home() {
 
   const handleAddFromHistory = (item: HistoryItem) => {
     const isSingleBlankRow = rows.length === 1 && 
-      rows[0].cliente.trim() === '' &&
-      rows[0].catalogo.trim() === '' &&
-      rows[0].assunto.trim() === '' &&
-      rows[0].descricao.trim() === '';
+      (rows[0].cliente || '').trim() === '' &&
+      (rows[0].catalogo || '').trim() === '' &&
+      (rows[0].assunto || '').trim() === '' &&
+      (rows[0].descricao || '').trim() === '';
 
     const newIdx = nextRowId;
     const newRow: ChamadoRow = {
@@ -4266,7 +4291,14 @@ export default function Home() {
               className="bg-[var(--modal-bg)] border border-[var(--border-color)] rounded-xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col shadow-2xl"
             >
               <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
-                <h3 className="font-bold text-sm text-[var(--text-main)]">Histórico Geral de Chamados Aberto</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-sm text-[var(--text-main)]">Histórico Geral de Chamados Aberto</h3>
+                  {historyItems.length > 0 && (
+                    <span className="text-[10px] font-bold text-[#89b4fa] bg-[#89b4fa]/10 border border-[#89b4fa]/20 px-2 py-0.5 rounded-full shrink-0">
+                      {historyItems.length}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-3">
                   {historyItems.length > 0 && (
                     <button
@@ -4283,30 +4315,32 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Barra de Pesquisa */}
+              {/* Barra de Busca de Histórico */}
               {historyItems.length > 0 && (
-                <div className="px-6 py-3 border-b border-[var(--border-color)] bg-[var(--border-color)]/5 flex items-center gap-3">
+                <div className="px-6 py-3 border-b border-[var(--border-color)]/30 bg-[var(--bg-toolbar)] flex items-center gap-3 select-none shrink-0">
                   <div className="relative flex-1">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--status-text)]" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--status-text)]/70" size={13} />
                     <input
                       type="text"
+                      placeholder="Pesquisar por ID, cliente, catálogo, assunto, descrição..."
                       value={historySearchQuery}
                       onChange={(e) => setHistorySearchQuery(e.target.value)}
-                      placeholder="Pesquisar por assunto ou descrição (palavras-chave)..."
-                      className="w-full bg-[var(--modal-input-bg)] border border-[var(--border-color)] rounded-lg pl-9 pr-8 py-2 text-xs text-[var(--text-main)] outline-none transition focus:border-[#89b4fa]/50 placeholder:text-[var(--status-text)]/70"
+                      className="w-full bg-[var(--bg-body)] border border-[var(--border-color)]/50 rounded-lg pl-9 pr-8 py-1.5 text-xs text-[var(--text-main)] outline-none focus:border-[#89b4fa]/40 transition"
                     />
                     {historySearchQuery && (
                       <button 
                         onClick={() => setHistorySearchQuery('')}
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--status-text)] hover:text-[var(--text-main)] transition"
                       >
-                        <X size={14} />
+                        <X size={13} />
                       </button>
                     )}
                   </div>
-                  <div className="text-[10px] font-semibold text-[var(--status-text)] uppercase tracking-wider shrink-0 bg-[var(--border-color)]/20 px-2.5 py-1.5 rounded-md">
-                    Encontrados: <strong className="text-[var(--text-main)] font-bold">{filteredHistoryItems.length}</strong>
-                  </div>
+                  {historySearchQuery && (
+                    <span className="text-[10px] font-bold text-[#89b4fa] bg-[#89b4fa]/10 border border-[#89b4fa]/20 px-2 py-1 rounded shrink-0">
+                      Encontrados: {filteredHistoryItems.length}
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -4316,9 +4350,8 @@ export default function Home() {
                     Nenhum chamado gerado recentemente nesta sessão.
                   </div>
                 ) : filteredHistoryItems.length === 0 ? (
-                  <div className="py-20 text-center text-xs text-[var(--status-text)] italic flex flex-col items-center justify-center gap-2">
-                    <Search size={24} className="opacity-40" />
-                    <span>Nenhum chamado encontrado com o termo &quot;{historySearchQuery}&quot;.</span>
+                  <div className="py-20 text-center text-xs text-[var(--status-text)] italic">
+                    Nenhum chamado corresponde aos filtros da pesquisa.
                   </div>
                 ) : (
                   <table className="w-full text-left border-collapse text-xs select-text">

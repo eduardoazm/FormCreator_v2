@@ -60,7 +60,6 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
   const [tickets, setTickets] = useState<HistoryTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   
   // Filters State
   const [dateRangePreset, setDateRangePreset] = useState<'all' | 'today' | '7days' | '30days' | 'custom'>('all');
@@ -131,28 +130,6 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
   // Filter tickets based on criteria
   const filteredTickets = useMemo(() => {
     return tickets.filter(ticket => {
-      // Search query (filters by ID, user, client, catalog, subject if admin)
-      const query = searchQuery.toLowerCase().trim();
-      if (query) {
-        const matchesBasic = 
-          (ticket.id && ticket.id.toLowerCase().includes(query)) ||
-          (ticket.glpi_id && ticket.glpi_id.toLowerCase().includes(query)) ||
-          (ticket.cliente && ticket.cliente.toLowerCase().includes(query)) ||
-          (ticket.catalogo && ticket.catalogo.toLowerCase().includes(query)) ||
-          (ticket.nome_usuario && ticket.nome_usuario.toLowerCase().includes(query)) ||
-          (ticket.email_usuario && ticket.email_usuario.toLowerCase().includes(query)) ||
-          (ticket.fila && ticket.fila.toLowerCase().includes(query));
-        
-        const matchesAdmin = userRole === 'admin' && (
-          (ticket.assunto && ticket.assunto.toLowerCase().includes(query)) ||
-          (ticket.descricao && ticket.descricao.toLowerCase().includes(query)) ||
-          (ticket.detalhes && ticket.detalhes.toLowerCase().includes(query)) ||
-          (ticket.resolucao && ticket.resolucao.toLowerCase().includes(query))
-        );
-
-        if (!matchesBasic && !matchesAdmin) return false;
-      }
-
       // Client filter
       if (selectedClient !== 'all' && ticket.cliente !== selectedClient) return false;
 
@@ -200,7 +177,7 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
 
       return true;
     });
-  }, [tickets, searchQuery, selectedClient, selectedQueue, selectedStatus, selectedDemandType, selectedTechnician, dateRangePreset, startDate, endDate, userRole]);
+  }, [tickets, selectedClient, selectedQueue, selectedStatus, selectedDemandType, selectedTechnician, dateRangePreset, startDate, endDate]);
 
   // Calculations for Dashboard Metrics (KPIs)
   const stats = useMemo(() => {
@@ -383,10 +360,9 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
             <span className="text-xs font-bold text-[var(--text-main)] flex items-center gap-1.5">
               <Filter size={13} className="text-[#89b4fa]" /> Filtros de Relatório
             </span>
-            {searchQuery || selectedClient !== 'all' || selectedQueue !== 'all' || selectedStatus !== 'all' || dateRangePreset !== 'all' || selectedDemandType !== 'all' || selectedTechnician !== 'all' ? (
+            {selectedClient !== 'all' || selectedQueue !== 'all' || selectedStatus !== 'all' || dateRangePreset !== 'all' || selectedDemandType !== 'all' || selectedTechnician !== 'all' ? (
               <button
                 onClick={() => {
-                  setSearchQuery('');
                   setSelectedClient('all');
                   setSelectedQueue('all');
                   setSelectedStatus('all');
@@ -403,22 +379,7 @@ export default function RelatorioView({ userEmail, userRole, openEditProfile }: 
             ) : null}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-            {/* Search Input */}
-            <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-[10px] font-semibold text-[var(--status-text)]">Termo de busca</label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--status-text)]/70" size={12} />
-                <input
-                  type="text"
-                  placeholder={userRole === 'admin' ? "Buscar ID, Cliente, Fila, Assunto, Técnico..." : "Buscar ID, Cliente, Fila..."}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-[var(--bg-body)] border border-[var(--border-color)]/40 rounded-lg pl-8 pr-3 py-1.5 text-xs text-[var(--text-main)] outline-none focus:border-[#89b4fa]/40 transition"
-                />
-              </div>
-            </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
             {/* Client Filter */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-semibold text-[var(--status-text)]">Cliente</label>
