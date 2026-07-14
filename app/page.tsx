@@ -2098,16 +2098,13 @@ export default function Home() {
             <h2 className="text-xl font-bold tracking-tight text-[var(--text-main)]">
               <span className="text-[#89b4fa] font-mono">FormCreator</span>
             </h2>
-            <p className="text-xs text-[var(--status-text)] mt-1.5 leading-relaxed">
-              Insira suas credenciais para gerenciar e automatizar os chamados da sua equipe.
-            </p>
           </div>
 
           <form onSubmit={handleLoginSubmit} className="space-y-5">
             {/* E-mail Input */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-[var(--status-text)] uppercase tracking-wider block">
-                E-mail de Usuário
+                E-MAIL
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[var(--status-text)]">
