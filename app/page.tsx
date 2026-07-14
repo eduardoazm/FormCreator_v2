@@ -46,7 +46,9 @@ import {
   Bot,
   Send,
   RefreshCw,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Table,
+  Database
 } from 'lucide-react';
 
 interface ChamadoRow {
@@ -747,6 +749,17 @@ export default function Home() {
   const [tempFilaOpen, setTempFilaOpen] = useState(false);
   const [searchCliente, setSearchCliente] = useState('');
   const [searchFila, setSearchFila] = useState('');
+
+  // States for Reference Tables Modal (Tabelas de Apoio)
+  const [modalReferenceTablesOpen, setModalReferenceTablesOpen] = useState(false);
+  const [refTableActiveTab, setRefTableActiveTab] = useState<'clientes' | 'catalogos' | 'filas'>('clientes');
+  const [refTableSearchQuery, setRefTableSearchQuery] = useState('');
+  const [lastFocusedRowIdx, setLastFocusedRowIdx] = useState<number | null>(null);
+
+  // States for Inline custom autocomplete dropdowns in the table rows
+  const [activeRowAutocomplete, setActiveRowAutocomplete] = useState<number | null>(null);
+  const [activeFieldAutocomplete, setActiveFieldAutocomplete] = useState<'cliente' | 'catalogo' | 'fila' | null>(null);
+  const [searchAutocompleteText, setSearchAutocompleteText] = useState('');
 
   const openEditProfile = () => {
     setTempCliente(defaultCliente);
@@ -3153,6 +3166,17 @@ export default function Home() {
               <Folder size={13} className="text-[#a6e3a1]" /> Kit Chamados <span className="opacity-70">({kits.length})</span>
             </button>
 
+            <button
+              onClick={() => {
+                setRefTableSearchQuery('');
+                setModalReferenceTablesOpen(true);
+              }}
+              className="px-3 py-1.5 rounded bg-[var(--btn-historico-bg)] text-[var(--btn-historico-text)] text-xs font-semibold flex items-center gap-1 transition hover:brightness-105"
+              title="Visualizar tabelas de referência (Cliente, Catálogo e Fila)"
+            >
+              <Table size={13} className="text-[#89b4fa]" /> Tabelas de Apoio
+            </button>
+
             {/* Status Indicator */}
             <div className="ml-auto flex items-center gap-2">
               <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 bg-[var(--status-bg)] text-[var(--status-text)] 
@@ -3253,6 +3277,29 @@ export default function Home() {
                   const isEmailInvalid = row.invalidFields?.includes('email_usuario');
                   const isCelInvalid = row.invalidFields?.includes('celular');
 
+                  // Filter lists for custom inline autocompletes
+                  const cliQuery = (row.cliente || '').toLowerCase().trim();
+                  const matchingClients = clientList.filter(c => 
+                    c.abreviatura.toLowerCase().includes(cliQuery) || 
+                    c.nome_completo.toLowerCase().includes(cliQuery)
+                  ).slice(0, 10);
+
+                  const catQuery = (row.catalogo || '').toLowerCase().trim();
+                  const matchingCatalogs = catalogList.filter(item => 
+                    item.toLowerCase().includes(catQuery)
+                  ).slice(0, 10);
+
+                  const filaQuery = (row.fila || '').toLowerCase().trim();
+                  const matchingFilas = FILAS_CATEGORIAS.map(cat => {
+                    const matching = cat.filas.filter(f => 
+                      f.toLowerCase().includes(filaQuery)
+                    );
+                    return {
+                      ...cat,
+                      filas: matching
+                    };
+                  }).filter(cat => cat.filas.length > 0);
+
                   const isComplete = 
                     !!row.cliente?.trim() && 
                     !!row.catalogo?.trim() && 
@@ -3280,20 +3327,54 @@ export default function Home() {
                       {/* # Index */}
                       <td className="text-center text-[#6c7086] font-mono select-none py-1.5">{index + 1}</td>
                       
-                      {/* Cliente input with autocomplete datalist */}
-                      <td className="p-1">
+                      {/* Cliente input with custom autocomplete popover */}
+                      <td className="p-1 relative">
                         <input
                           type="text"
                           value={row.cliente || ''}
-                          onChange={(e) => handleClienteChange(row.idx, e.target.value)}
-                          onBlur={(e) => handleClienteBlur(row.idx, e.target.value)}
+                          onChange={(e) => {
+                            handleClienteChange(row.idx, e.target.value);
+                            setSearchAutocompleteText(e.target.value);
+                          }}
+                          onFocus={() => {
+                            setLastFocusedRowIdx(row.idx);
+                            setActiveRowAutocomplete(row.idx);
+                            setActiveFieldAutocomplete('cliente');
+                            setSearchAutocompleteText(row.cliente || '');
+                          }}
+                          onBlur={() => {
+                            handleClienteBlur(row.idx, row.cliente || '');
+                            setTimeout(() => {
+                              setActiveRowAutocomplete(null);
+                              setActiveFieldAutocomplete(null);
+                            }, 180);
+                          }}
                           placeholder="Ex: PZL, FMT, FCECON..."
-                          list="clientes-dl"
                           autoComplete="off"
                           className={`w-full bg-transparent border rounded px-2 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--input-border-focus)] focus:bg-[var(--input-bg-focus)]
                             ${isCliInvalid ? 'border-[var(--input-invalid-border)] bg-[var(--input-invalid-bg)]' : 'border-transparent'}
                           `}
                         />
+                        {activeRowAutocomplete === row.idx && activeFieldAutocomplete === 'cliente' && matchingClients.length > 0 && (
+                          <div className="absolute left-0 mt-1 w-[380px] sm:w-[480px] max-h-80 overflow-y-auto bg-[var(--modal-bg)] border border-[var(--border-color)] rounded-lg shadow-2xl z-50 py-1 divide-y divide-[var(--border-color)]/30 scrollbar-thin">
+                            {matchingClients.map((c) => (
+                              <div
+                                key={c.abreviatura}
+                                onMouseDown={() => {
+                                  updateRowField(row.idx, 'cliente', c.nome_completo);
+                                  setActiveRowAutocomplete(null);
+                                  setActiveFieldAutocomplete(null);
+                                }}
+                                className="w-full text-left px-4 py-2 hover:bg-[var(--border-color)]/50 transition flex items-center gap-3 cursor-pointer"
+                              >
+                                <span className="font-bold text-xs bg-[#89b4fa]/10 border border-[#89b4fa]/20 text-[#89b4fa] px-2 py-0.5 rounded shrink-0">
+                                  {c.abreviatura}
+                                </span>
+                                <span className="text-xs text-[var(--text-main)] font-semibold truncate">{c.nome_completo}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </td>
 
                       {/* Tipo de Demanda */}
@@ -3322,19 +3403,59 @@ export default function Home() {
                         </select>
                       </td>
 
-                      {/* Catálogo */}
-                      <td className="p-1">
+                      {/* Catálogo input with custom autocomplete popover */}
+                      <td className="p-1 relative">
                         <input
                           type="text"
                           value={row.catalogo || ''}
-                          onChange={(e) => updateRowField(row.idx, 'catalogo', e.target.value)}
+                          onChange={(e) => {
+                            updateRowField(row.idx, 'catalogo', e.target.value);
+                            setSearchAutocompleteText(e.target.value);
+                          }}
+                          onFocus={() => {
+                            setLastFocusedRowIdx(row.idx);
+                            setActiveRowAutocomplete(row.idx);
+                            setActiveFieldAutocomplete('catalogo');
+                            setSearchAutocompleteText(row.catalogo || '');
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              setActiveRowAutocomplete(null);
+                              setActiveFieldAutocomplete(null);
+                            }, 180);
+                          }}
                           placeholder="Pesquisar catálogo..."
-                          list="catalogos-dl"
                           autoComplete="off"
                           className={`w-full bg-transparent border rounded px-2 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--input-border-focus)] focus:bg-[var(--input-bg-focus)]
                             ${isCatInvalid ? 'border-[var(--input-invalid-border)] bg-[var(--input-invalid-bg)]' : 'border-transparent'}
                           `}
                         />
+                        {activeRowAutocomplete === row.idx && activeFieldAutocomplete === 'catalogo' && matchingCatalogs.length > 0 && (
+                          <div className="absolute left-0 mt-1 w-[450px] sm:w-[600px] max-h-96 overflow-y-auto bg-[var(--modal-bg)] border border-[var(--border-color)] rounded-lg shadow-2xl z-50 py-1 divide-y divide-[var(--border-color)]/30 scrollbar-thin">
+                            {matchingCatalogs.map((cat) => {
+                              const parts = cat.split(/[>»]/).map(p => p.trim());
+                              const service = parts[parts.length - 1] || cat;
+                              const category = parts.slice(0, parts.length - 1).join(' › ');
+
+                              return (
+                                <div
+                                  key={cat}
+                                  onMouseDown={() => {
+                                    updateRowField(row.idx, 'catalogo', cat);
+                                    setActiveRowAutocomplete(null);
+                                    setActiveFieldAutocomplete(null);
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-[var(--border-color)]/50 transition flex flex-col gap-1 cursor-pointer"
+                                >
+                                  <span className="font-bold text-xs text-[var(--text-main)]">{service}</span>
+                                  {category && (
+                                    <span className="text-[10px] text-[var(--status-text)] font-semibold truncate">{category}</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </td>
 
                       {/* Assunto */}
@@ -3415,18 +3536,56 @@ export default function Home() {
 
                       {/* Fila (Manaus or UBS) */}
                       {(atendimento === 'ubs' || atendimento === 'manaus') && (
-                        <td className="p-1">
+                        <td className="p-1 relative">
                           <input
                             type="text"
                             value={row.fila || ''}
-                            onChange={(e) => updateRowField(row.idx, 'fila', e.target.value)}
+                            onChange={(e) => {
+                              updateRowField(row.idx, 'fila', e.target.value);
+                              setSearchAutocompleteText(e.target.value);
+                            }}
+                            onFocus={() => {
+                              setLastFocusedRowIdx(row.idx);
+                              setActiveRowAutocomplete(row.idx);
+                              setActiveFieldAutocomplete('fila');
+                              setSearchAutocompleteText(row.fila || '');
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => {
+                                setActiveRowAutocomplete(null);
+                                setActiveFieldAutocomplete(null);
+                              }, 180);
+                            }}
                             placeholder="Digitar ou selecionar fila..."
-                            list="filas-dl"
                             autoComplete="off"
                             className={`w-full bg-transparent border rounded px-2 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--input-border-focus)] focus:bg-[var(--input-bg-focus)]
                               ${isFilaInvalid ? 'border-[var(--input-invalid-border)] bg-[var(--input-invalid-bg)]' : 'border-transparent'}
                             `}
                           />
+                          {activeRowAutocomplete === row.idx && activeFieldAutocomplete === 'fila' && matchingFilas.length > 0 && (
+                            <div className="absolute right-0 mt-1 w-[320px] sm:w-[420px] max-h-80 overflow-y-auto bg-[var(--modal-bg)] border border-[var(--border-color)] rounded-lg shadow-2xl z-50 py-1 scrollbar-thin">
+                              {matchingFilas.map((cat) => (
+                                <div key={cat.nome} className="flex flex-col">
+                                  <div className="px-4 py-1.5 text-[9px] font-bold uppercase tracking-widest text-[var(--status-text)] bg-[var(--border-color)]/20 border-y border-[var(--border-color)]/20">
+                                    {cat.nome}
+                                  </div>
+                                  {cat.filas.map((f) => (
+                                    <div
+                                      key={f}
+                                      onMouseDown={() => {
+                                        updateRowField(row.idx, 'fila', f);
+                                        setActiveRowAutocomplete(null);
+                                        setActiveFieldAutocomplete(null);
+                                      }}
+                                      className="w-full text-left px-5 py-2 text-xs text-[var(--text-main)] hover:bg-[var(--border-color)]/50 transition cursor-pointer font-medium"
+                                    >
+                                      {f}
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                       )}
 
@@ -4304,6 +4463,306 @@ export default function Home() {
                   Cadastrar Resolução
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Modal: Tabelas de Apoio (Cliente, Catálogo, Fila) ── */}
+      <AnimatePresence>
+        {modalReferenceTablesOpen && (
+          <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[110] px-4 py-6">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="bg-[var(--modal-bg)] border border-[var(--border-color)] rounded-xl w-full max-w-7xl h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+            >
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--border-color)]/10">
+                <div className="flex items-center gap-2">
+                  <Database className="text-[#89b4fa]" size={18} />
+                  <h3 className="font-bold text-sm text-[var(--text-main)]">
+                    Tabelas de Apoio & Referência
+                  </h3>
+                </div>
+                <button 
+                  onClick={() => setModalReferenceTablesOpen(false)} 
+                  className="text-[var(--status-text)] hover:text-[var(--text-main)] transition cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Toolbar/Search inside Modal */}
+              <div className="p-4 border-b border-[var(--border-color)] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[var(--border-color)]/5">
+                {/* Tabs */}
+                <div className="flex rounded-lg bg-[var(--border-color)]/20 p-0.5 border border-[var(--border-color)]/30">
+                  {[
+                    { id: 'clientes', label: 'Clientes', count: clientList.length },
+                    { id: 'catalogos', label: 'Catálogo de Serviços', count: catalogList.length },
+                    { id: 'filas', label: 'Filas de Atendimento', count: FILAS_CATEGORIAS.reduce((acc, curr) => acc + curr.filas.length, 0) }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        setRefTableActiveTab(tab.id as any);
+                        setRefTableSearchQuery('');
+                      }}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                        refTableActiveTab === tab.id
+                          ? 'bg-[#89b4fa]/20 text-[#89b4fa] font-bold'
+                          : 'text-[var(--status-text)] hover:text-[var(--text-main)]'
+                      }`}
+                    >
+                      <span>{tab.label}</span>
+                      <span className="text-[10px] bg-[var(--border-color)] px-1.5 py-0.5 rounded-full text-[var(--status-text)] font-mono">
+                        {tab.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Search Bar */}
+                <div className="relative flex-1 max-w-sm">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--status-text)]" />
+                  <input
+                    type="text"
+                    value={refTableSearchQuery}
+                    onChange={(e) => setRefTableSearchQuery(e.target.value)}
+                    placeholder="Pesquisar itens..."
+                    className="w-full bg-[var(--input-bg-focus)] border border-[var(--border-color)] rounded-lg pl-9 pr-8 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--input-border-focus)] placeholder-[var(--status-text)]"
+                  />
+                  {refTableSearchQuery && (
+                    <button
+                      onClick={() => setRefTableSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--status-text)] hover:text-[var(--text-main)]"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Informative Header / Helper Context */}
+              <div className="px-6 py-2 bg-emerald-950/20 border-b border-emerald-500/10 text-[11px] text-emerald-400 flex items-center justify-between select-none">
+                <span>
+                  {lastFocusedRowIdx !== null ? (
+                    <>
+                      Linha ativa selecionada: <strong className="font-bold underline">Linha #{rows.findIndex(r => r.idx === lastFocusedRowIdx) + 1}</strong>. Clicar em <strong>Inserir</strong> preencherá esta linha correspondente.
+                    </>
+                  ) : (
+                    <>
+                      Nenhuma linha selecionada na tabela principal. Clique em <strong>Copiar</strong> para usar a área de transferência, ou selecione uma linha antes de abrir.
+                    </>
+                  )}
+                </span>
+              </div>
+
+              {/* Content Area */}
+              <div className="flex-1 overflow-y-auto p-6 scrollbar-thin bg-[var(--bg-body)]">
+                
+                {/* TAB: CLIENTES */}
+                {refTableActiveTab === 'clientes' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                    {clientList
+                      .filter(c => {
+                        const term = refTableSearchQuery.toLowerCase().trim();
+                        return c.abreviatura.toLowerCase().includes(term) || c.nome_completo.toLowerCase().includes(term);
+                      })
+                      .map((c) => (
+                        <div 
+                          key={c.abreviatura}
+                          className="flex items-center justify-between p-3.5 rounded-lg border border-[var(--border-color)] bg-[var(--border-color)]/10 hover:border-[#89b4fa]/30 transition group gap-4 shadow-sm"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <span className="font-bold text-xs bg-[#89b4fa]/10 border border-[#89b4fa]/20 text-[#89b4fa] px-2 py-0.5 rounded w-max block mb-1.5">
+                              {c.abreviatura}
+                            </span>
+                            <p className="text-xs text-[var(--text-main)] font-semibold truncate leading-normal" title={c.nome_completo}>
+                              {c.nome_completo}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(c.abreviatura);
+                                showToast(`Abreviatura "${c.abreviatura}" copiada!`);
+                              }}
+                              className="p-1.5 rounded bg-[var(--border-color)] text-[var(--text-main)] hover:text-white hover:bg-[var(--border-color)]/60 transition cursor-pointer text-[10px] font-bold flex items-center gap-1"
+                              title="Copiar abreviatura"
+                            >
+                              <Copy size={11} />
+                              <span>Abrev</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                let targetIdx = lastFocusedRowIdx;
+                                if (targetIdx === null) {
+                                  if (rows.length > 0) targetIdx = rows[0].idx;
+                                  else {
+                                    addRow();
+                                    targetIdx = nextRowId;
+                                  }
+                                }
+                                updateRowField(targetIdx, 'cliente', c.nome_completo);
+                                showToast(`Cliente inserido com sucesso!`);
+                              }}
+                              className="px-2.5 py-1.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:text-emerald-300 transition cursor-pointer text-[10px] font-bold"
+                            >
+                              Inserir
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+                {/* TAB: CATALOGOS */}
+                {refTableActiveTab === 'catalogos' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                    {catalogList
+                      .filter(item => item.toLowerCase().includes(refTableSearchQuery.toLowerCase().trim()))
+                      .map((cat) => {
+                        const parts = cat.split(/[>»]/).map(p => p.trim());
+                        const service = parts[parts.length - 1] || cat;
+                        const category = parts.slice(0, parts.length - 1).join(' › ');
+
+                        return (
+                          <div 
+                            key={cat}
+                            className="flex items-center justify-between p-3.5 rounded-lg border border-[var(--border-color)] bg-[var(--border-color)]/10 hover:border-[#89b4fa]/30 transition group gap-4 shadow-sm"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-[var(--text-main)] font-bold truncate leading-tight mb-1.5">
+                                {service}
+                              </p>
+                              {category && (
+                                <p className="text-[10px] text-[var(--status-text)] truncate font-medium" title={category}>
+                                  {category}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(cat);
+                                  showToast('Item do catálogo copiado!');
+                                }}
+                                className="p-1.5 rounded bg-[var(--border-color)] text-[var(--text-main)] hover:text-white hover:bg-[var(--border-color)]/60 transition cursor-pointer text-[10px] font-bold flex items-center gap-1"
+                                title="Copiar caminho completo"
+                              >
+                                <Copy size={11} />
+                                <span>Copiar</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  let targetIdx = lastFocusedRowIdx;
+                                  if (targetIdx === null) {
+                                    if (rows.length > 0) targetIdx = rows[0].idx;
+                                    else {
+                                      addRow();
+                                      targetIdx = nextRowId;
+                                    }
+                                  }
+                                  updateRowField(targetIdx, 'catalogo', cat);
+                                  showToast(`Catálogo inserido com sucesso!`);
+                                }}
+                                className="px-2.5 py-1.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:text-emerald-300 transition cursor-pointer text-[10px] font-bold"
+                              >
+                                Inserir
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* TAB: FILAS */}
+                {refTableActiveTab === 'filas' && (
+                  <div className="flex flex-col gap-6">
+                    {FILAS_CATEGORIAS.map((cat) => {
+                      const matchingFilas = cat.filas.filter(f => f.toLowerCase().includes(refTableSearchQuery.toLowerCase().trim()));
+                      if (matchingFilas.length === 0) return null;
+
+                      return (
+                        <div key={cat.nome} className="border border-[var(--border-color)]/60 rounded-xl bg-[var(--border-color)]/5 overflow-hidden shadow-sm">
+                          <div className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-[var(--table-th-text)] bg-[var(--border-color)]/25 border-b border-[var(--border-color)]/60">
+                            {cat.nome}
+                          </div>
+                          
+                          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+                            {matchingFilas.map((f) => (
+                              <div 
+                                key={f}
+                                className="flex items-center justify-between p-2.5 rounded-lg border border-[var(--border-color)]/80 bg-[var(--modal-bg)] hover:border-[#89b4fa]/30 transition group gap-2 shadow-sm"
+                              >
+                                <span className="text-xs text-[var(--text-main)] font-semibold truncate leading-none py-1">
+                                  {f}
+                                </span>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(f);
+                                      showToast(`Fila "${f}" copiada!`);
+                                    }}
+                                    className="p-1.5 rounded bg-[var(--border-color)] text-[var(--status-text)] hover:text-[var(--text-main)] hover:bg-[var(--border-color)]/60 transition cursor-pointer"
+                                    title="Copiar nome da fila"
+                                  >
+                                    <Copy size={11} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      let targetIdx = lastFocusedRowIdx;
+                                      if (targetIdx === null) {
+                                        if (rows.length > 0) targetIdx = rows[0].idx;
+                                        else {
+                                          addRow();
+                                          targetIdx = nextRowId;
+                                        }
+                                      }
+                                      updateRowField(targetIdx, 'fila', f);
+                                      showToast(`Fila inserida com sucesso!`);
+                                    }}
+                                    className="px-2 py-1.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/25 hover:text-emerald-300 transition cursor-pointer text-[10px] font-bold"
+                                  >
+                                    Inserir
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-[var(--border-color)] flex items-center justify-end bg-[var(--border-color)]/10">
+                <button
+                  type="button"
+                  onClick={() => setModalReferenceTablesOpen(false)}
+                  className="px-4 py-2 rounded bg-[var(--btn-ghost-bg)] text-[var(--btn-ghost-text)] text-xs font-semibold hover:brightness-105 transition cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+
             </motion.div>
           </div>
         )}

@@ -39,7 +39,7 @@ const CATALOGOS = [
   "Sistemas > Produtos » SX Sigma » Requisições",
   "Sistemas > Produtos » SX Sigma » Reset de Senha",
   "Sistemas > Produtos » SX Sigma » SADT",
-  "Sistemas > Produtos » SX Sigma » Suprimentos",
+  "Sistemas > Produtos._v_ » SX Sigma » Suprimentos",
   "Sistemas > Produtos » SX Sigma » Treinamento Sx Sigma",
   "Sistemas > Produtos » SX Sigma » Vinculação de Usuário Sx Sigma",
   "Sistemas > Suporte Interno » Instalação de Impressoras",
