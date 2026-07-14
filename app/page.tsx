@@ -138,7 +138,7 @@ const formatBytes = (bytes: number): string => {
   return `${val} ${sizes[i]}`;
 };
 
-const FILAS_CATEGORIAS = [
+const DEFAULT_FILAS_CATEGORIAS = [
   {
     nome: "Salux",
     filas: [
@@ -232,7 +232,7 @@ export default function Home() {
     return match ? match.perfil : 'admin';
   }, [users, userEmail]);
 
-  const [activeView, setActiveView] = useState<'gerador' | 'usuarios' | 'relatorio'>('gerador');
+  const [activeView, setActiveView] = useState<'gerador' | 'usuarios' | 'relatorio' | 'tabelas_apoio'>('gerador');
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<GLPIUser | null>(null);
 
@@ -775,11 +775,21 @@ export default function Home() {
   const [searchCliente, setSearchCliente] = useState('');
   const [searchFila, setSearchFila] = useState('');
 
-  // States for Reference Tables Modal (Tabelas de Apoio)
+  // States for Reference Tables (Tabelas de Apoio)
+  const [filasCategorias, setFilasCategorias] = useState<{ nome: string; filas: string[] }[]>(DEFAULT_FILAS_CATEGORIAS);
   const [modalReferenceTablesOpen, setModalReferenceTablesOpen] = useState(false);
   const [refTableActiveTab, setRefTableActiveTab] = useState<'clientes' | 'catalogos' | 'filas'>('clientes');
   const [refTableSearchQuery, setRefTableSearchQuery] = useState('');
   const [lastFocusedRowIdx, setLastFocusedRowIdx] = useState<number | null>(null);
+
+  // States for registering reference items
+  const [newClientAbrev, setNewClientAbrev] = useState('');
+  const [newClientNome, setNewClientNome] = useState('');
+  const [newCatalogNome, setNewCatalogNome] = useState('');
+  const [newFilaCategoria, setNewFilaCategoria] = useState('Salux');
+  const [newFilaCategoriaCustom, setNewFilaCategoriaCustom] = useState('');
+  const [newFilaNome, setNewFilaNome] = useState('');
+  const [submittingRefTable, setSubmittingRefTable] = useState(false);
 
   // States for Inline custom autocomplete dropdowns in the table rows
   const [activeRowAutocomplete, setActiveRowAutocomplete] = useState<number | null>(null);
@@ -820,7 +830,7 @@ export default function Home() {
       finalFila = '';
     } else {
       let foundFila = '';
-      for (const cat of FILAS_CATEGORIAS) {
+      for (const cat of filasCategorias) {
         const matched = cat.filas.find(f => f.toLowerCase() === searchFila.toLowerCase().trim());
         if (matched) {
           foundFila = matched;
@@ -1026,7 +1036,11 @@ export default function Home() {
       setCheckingAuth(false);
     }, 0);
 
-    // Load static lists
+    // Load initial ticket history count
+    updateHistoryCount();
+  }, []);
+
+  const refreshStaticLists = useCallback(() => {
     fetch('/api/clientes/buscar?q=')
       .then((r) => r.json())
       .then((data) => setClientList(data.clientes || []))
@@ -1037,9 +1051,116 @@ export default function Home() {
       .then((data) => setCatalogList((data.catalogos || []).map((x: any) => x.nome)))
       .catch((e) => console.warn('Erro ao carregar catálogo:', e));
 
-    // Load initial ticket history count
-    updateHistoryCount();
+    fetch('/api/filas')
+      .then((r) => r.json())
+      .then((data) => setFilasCategorias(data.categorias || []))
+      .catch((e) => console.warn('Erro ao carregar filas:', e));
   }, []);
+
+  // Trigger loading list values when auth resolves
+  useEffect(() => {
+    if (isLoggedIn) {
+      refreshStaticLists();
+    }
+  }, [isLoggedIn, refreshStaticLists]);
+
+  const handleAddClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newClientAbrev.trim() || !newClientNome.trim()) {
+      showToast('Abreviatura e nome completo são obrigatórios!');
+      return;
+    }
+    setSubmittingRefTable(true);
+    try {
+      const res = await fetch('/api/clientes/buscar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          abreviatura: newClientAbrev.trim(),
+          nome_completo: newClientNome.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Erro ao cadastrar cliente.');
+      } else {
+        showToast('Cliente cadastrado com sucesso!');
+        setNewClientAbrev('');
+        setNewClientNome('');
+        refreshStaticLists();
+      }
+    } catch (err) {
+      showToast('Erro de rede ao cadastrar cliente.');
+    } finally {
+      setSubmittingRefTable(false);
+    }
+  };
+
+  const handleAddCatalog = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatalogNome.trim()) {
+      showToast('Nome do serviço é obrigatório!');
+      return;
+    }
+    setSubmittingRefTable(true);
+    try {
+      const res = await fetch('/api/catalogos/buscar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: newCatalogNome.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Erro ao cadastrar item de catálogo.');
+      } else {
+        showToast('Item de catálogo cadastrado com sucesso!');
+        setNewCatalogNome('');
+        refreshStaticLists();
+      }
+    } catch (err) {
+      showToast('Erro de rede ao cadastrar catálogo.');
+    } finally {
+      setSubmittingRefTable(false);
+    }
+  };
+
+  const handleAddFila = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalCategory = newFilaCategoria === 'custom' ? newFilaCategoriaCustom : newFilaCategoria;
+    if (!finalCategory.trim() || !newFilaNome.trim()) {
+      showToast('Categoria e Nome da Fila são obrigatórios!');
+      return;
+    }
+    setSubmittingRefTable(true);
+    try {
+      const res = await fetch('/api/filas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoria: finalCategory.trim(),
+          fila: newFilaNome.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Erro ao cadastrar fila.');
+      } else {
+        showToast('Fila de atendimento cadastrada com sucesso!');
+        setNewFilaNome('');
+        if (newFilaCategoria === 'custom') {
+          setNewFilaCategoria(finalCategory.trim());
+          setNewFilaCategoriaCustom('');
+        }
+        refreshStaticLists();
+      }
+    } catch (err) {
+      showToast('Erro de rede ao cadastrar fila.');
+    } finally {
+      setSubmittingRefTable(false);
+    }
+  };
 
   // Sync theme attribute dynamically including system preferences
   useEffect(() => {
@@ -2309,7 +2430,7 @@ export default function Home() {
   });
 
   // Filter queues for modal search
-  const filteredFilas = FILAS_CATEGORIAS.map(cat => {
+  const filteredFilas = filasCategorias.map(cat => {
     const matching = cat.filas.filter(f => {
       if (!searchFila) return true;
       return f.toLowerCase().includes(searchFila.toLowerCase().trim());
@@ -2392,6 +2513,23 @@ export default function Home() {
                     <FileSpreadsheet size={15} />
                     <span>Relatório de Chamados</span>
                   </button>
+
+                  {getLoggedUserRole() === 'admin' && (
+                    <button
+                      onClick={() => {
+                        setActiveView('tabelas_apoio');
+                        setMobileSidebarOpen(false);
+                      }}
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
+                        activeView === 'tabelas_apoio'
+                          ? 'bg-[#89b4fa]/10 border-[#89b4fa]/20 text-[#89b4fa] font-semibold'
+                          : 'bg-transparent border-transparent text-[var(--status-text)] hover:bg-[var(--border-color)]/30 hover:text-[var(--text-main)]'
+                      }`}
+                    >
+                      <Table size={15} />
+                      <span>Tabelas de Apoio</span>
+                    </button>
+                  )}
 
                   {getLoggedUserRole() === 'admin' && (
                     <button
@@ -3132,6 +3270,322 @@ export default function Home() {
                 </div>
               </div>
             )
+          ) : activeView === 'tabelas_apoio' ? (
+            <div className="flex-1 overflow-y-auto select-text p-6 flex flex-col gap-6 scrollbar-thin">
+              {/* Header */}
+              <div className="flex flex-col gap-1.5 border-b border-[var(--border-color)]/30 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <Database className="text-[#89b4fa]" size={20} />
+                  <h2 className="text-base font-bold text-[var(--text-main)] tracking-tight">
+                    Tabelas de Apoio & Referência
+                  </h2>
+                </div>
+                <p className="text-xs text-[var(--status-text)]">
+                  Cadastre e gerencie os Clientes, Catálogo de Serviços e Filas de Atendimento do sistema. As alterações aparecerão imediatamente para todos os técnicos.
+                </p>
+              </div>
+
+              {/* View/Tab Selector inside the page */}
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-[var(--border-color)]/5 border border-[var(--border-color)]/30 p-4 rounded-xl">
+                {/* Tabs */}
+                <div className="flex rounded-lg bg-[var(--border-color)]/20 p-0.5 border border-[var(--border-color)]/30 w-max shrink-0">
+                  {[
+                    { id: 'clientes', label: 'Clientes', count: clientList.length },
+                    { id: 'catalogos', label: 'Catálogo de Serviços', count: catalogList.length },
+                    { id: 'filas', label: 'Filas de Atendimento', count: filasCategorias.reduce((acc, curr) => acc + curr.filas.length, 0) }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        setRefTableActiveTab(tab.id as any);
+                        setRefTableSearchQuery('');
+                      }}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                        refTableActiveTab === tab.id
+                          ? 'bg-[#89b4fa]/20 text-[#89b4fa] font-bold'
+                          : 'text-[var(--status-text)] hover:text-[var(--text-main)]'
+                      }`}
+                    >
+                      <span>{tab.label}</span>
+                      <span className="text-[10px] bg-[var(--border-color)] px-1.5 py-0.5 rounded-full text-[var(--status-text)] font-mono">
+                        {tab.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Search Bar */}
+                <div className="relative flex-1 max-w-sm">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--status-text)]" />
+                  <input
+                    type="text"
+                    value={refTableSearchQuery}
+                    onChange={(e) => setRefTableSearchQuery(e.target.value)}
+                    placeholder="Pesquisar itens cadastrados..."
+                    className="w-full bg-[var(--input-bg-focus)] border border-[var(--border-color)] rounded-lg pl-9 pr-8 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--input-border-focus)] placeholder-[var(--status-text)]"
+                  />
+                  {refTableSearchQuery && (
+                    <button
+                      onClick={() => setRefTableSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--status-text)] hover:text-[var(--text-main)]"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Split Layout: Add form on the left, current items list on the right */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                {/* LEFT SIDE: Form registration */}
+                <div className="lg:col-span-4 border border-[var(--border-color)]/80 bg-[var(--modal-bg)]/20 p-5 rounded-xl shadow-sm flex flex-col gap-4">
+                  <div className="border-b border-[var(--border-color)]/40 pb-2 flex items-center gap-2">
+                    <Plus size={14} className="text-[#a6e3a1]" />
+                    <h3 className="font-bold text-xs text-[var(--text-main)] uppercase tracking-wider">
+                      Cadastrar Novo {refTableActiveTab === 'clientes' ? 'Cliente' : refTableActiveTab === 'catalogos' ? 'Serviço' : 'Fila'}
+                    </h3>
+                  </div>
+
+                  {refTableActiveTab === 'clientes' && (
+                    <form onSubmit={handleAddClient} className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-[var(--status-text)] uppercase tracking-wider">Abreviatura / Sigla</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: PZL, HUFM, FMT"
+                          value={newClientAbrev}
+                          onChange={(e) => setNewClientAbrev(e.target.value)}
+                          className="w-full bg-[var(--input-bg-focus)] border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--input-border-focus)]"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-[var(--status-text)] uppercase tracking-wider">Nome Completo do Cliente / Unidade</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: SES-AM - PZL - Policlinica Zeno Lanzini"
+                          value={newClientNome}
+                          onChange={(e) => setNewClientNome(e.target.value)}
+                          className="w-full bg-[var(--input-bg-focus)] border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--input-border-focus)]"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={submittingRefTable}
+                        className="w-full py-2 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold text-xs rounded-lg transition hover:bg-emerald-500/25 active:scale-95 disabled:opacity-50"
+                      >
+                        {submittingRefTable ? 'Cadastrando...' : 'Adicionar Cliente'}
+                      </button>
+                    </form>
+                  )}
+
+                  {refTableActiveTab === 'catalogos' && (
+                    <form onSubmit={handleAddCatalog} className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-[var(--status-text)] uppercase tracking-wider">Caminho / Nome do Serviço</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: Sistemas > Produtos » SX Sigma » Agenda"
+                          value={newCatalogNome}
+                          onChange={(e) => setNewCatalogNome(e.target.value)}
+                          className="w-full bg-[var(--input-bg-focus)] border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--input-border-focus)]"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={submittingRefTable}
+                        className="w-full py-2 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold text-xs rounded-lg transition hover:bg-emerald-500/25 active:scale-95 disabled:opacity-50"
+                      >
+                        {submittingRefTable ? 'Cadastrando...' : 'Adicionar Serviço'}
+                      </button>
+                    </form>
+                  )}
+
+                  {refTableActiveTab === 'filas' && (
+                    <form onSubmit={handleAddFila} className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-[var(--status-text)] uppercase tracking-wider">Categoria / Setor</label>
+                        <select
+                          value={newFilaCategoria}
+                          onChange={(e) => setNewFilaCategoria(e.target.value)}
+                          className="w-full bg-[var(--input-bg-focus)] border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--input-border-focus)]"
+                        >
+                          {filasCategorias.map(c => (
+                            <option key={c.nome} value={c.nome}>{c.nome}</option>
+                          ))}
+                          <option value="custom">+ Outra (Nova Categoria)</option>
+                        </select>
+                      </div>
+
+                      {newFilaCategoria === 'custom' && (
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-bold text-[var(--status-text)] uppercase tracking-wider">Nova Categoria</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ex: Salux > Novo Setor"
+                            value={newFilaCategoriaCustom}
+                            onChange={(e) => setNewFilaCategoriaCustom(e.target.value)}
+                            className="w-full bg-[var(--input-bg-focus)] border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--input-border-focus)]"
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-[var(--status-text)] uppercase tracking-wider">Nome da Fila</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: Atendimento N3"
+                          value={newFilaNome}
+                          onChange={(e) => setNewFilaNome(e.target.value)}
+                          className="w-full bg-[var(--input-bg-focus)] border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--input-border-focus)]"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={submittingRefTable}
+                        className="w-full py-2 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold text-xs rounded-lg transition hover:bg-emerald-500/25 active:scale-95 disabled:opacity-50"
+                      >
+                        {submittingRefTable ? 'Cadastrando...' : 'Adicionar Fila'}
+                      </button>
+                    </form>
+                  )}
+                </div>
+
+                {/* RIGHT SIDE: List matching current search and tab */}
+                <div className="lg:col-span-8 flex flex-col gap-4">
+                  {/* TAB: CLIENTES */}
+                  {refTableActiveTab === 'clientes' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {clientList
+                        .filter(c => {
+                          const term = refTableSearchQuery.toLowerCase().trim();
+                          return c.abreviatura.toLowerCase().includes(term) || c.nome_completo.toLowerCase().includes(term);
+                        })
+                        .map((c) => (
+                          <div 
+                            key={c.abreviatura}
+                            className="flex items-center justify-between p-3.5 rounded-lg border border-[var(--border-color)] bg-[var(--border-color)]/10 hover:border-[#89b4fa]/30 transition group gap-4 shadow-sm"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <span className="font-bold text-xs bg-[#89b4fa]/10 border border-[#89b4fa]/20 text-[#89b4fa] px-2 py-0.5 rounded w-max block mb-1.5">
+                                {c.abreviatura}
+                              </span>
+                              <p className="text-xs text-[var(--text-main)] font-semibold truncate leading-normal" title={c.nome_completo}>
+                                {c.nome_completo}
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(c.abreviatura);
+                                showToast(`Abreviatura "${c.abreviatura}" copiada!`);
+                              }}
+                              className="p-1.5 rounded bg-[var(--border-color)] text-[var(--text-main)] hover:text-white hover:bg-[var(--border-color)]/60 transition cursor-pointer text-[10px] font-bold flex items-center gap-1 shrink-0"
+                              title="Copiar abreviatura"
+                            >
+                              <Copy size={11} />
+                              <span>Copiar</span>
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
+                  {refTableActiveTab === 'catalogos' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {catalogList
+                        .filter(item => item.toLowerCase().includes(refTableSearchQuery.toLowerCase().trim()))
+                        .map((cat) => {
+                          const parts = cat.split(/[>»]/).map(p => p.trim());
+                          const service = parts[parts.length - 1] || cat;
+                          const category = parts.slice(0, parts.length - 1).join(' › ');
+
+                          return (
+                            <div 
+                              key={cat}
+                              className="flex items-center justify-between p-3.5 rounded-lg border border-[var(--border-color)] bg-[var(--border-color)]/10 hover:border-[#89b4fa]/30 transition group gap-4 shadow-sm"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-[var(--text-main)] font-bold truncate leading-tight mb-1.5" title={service}>
+                                  {service}
+                                </p>
+                                {category && (
+                                  <p className="text-[10px] text-[var(--status-text)] truncate font-medium" title={category}>
+                                    {category}
+                                  </p>
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(cat);
+                                  showToast('Item do catálogo copiado!');
+                                }}
+                                className="p-1.5 rounded bg-[var(--border-color)] text-[var(--text-main)] hover:text-white hover:bg-[var(--border-color)]/60 transition cursor-pointer text-[10px] font-bold flex items-center gap-1 shrink-0"
+                                title="Copiar caminho completo"
+                              >
+                                <Copy size={11} />
+                                <span>Copiar</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+
+                  {refTableActiveTab === 'filas' && (
+                    <div className="flex flex-col gap-4">
+                      {filasCategorias.map((cat) => {
+                        const matchingFilas = cat.filas.filter(f => f.toLowerCase().includes(refTableSearchQuery.toLowerCase().trim()));
+                        if (matchingFilas.length === 0) return null;
+
+                        return (
+                          <div key={cat.nome} className="border border-[var(--border-color)]/60 rounded-xl bg-[var(--border-color)]/5 overflow-hidden shadow-sm">
+                            <div className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-[var(--table-th-text)] bg-[var(--border-color)]/25 border-b border-[var(--border-color)]/60">
+                              {cat.nome}
+                            </div>
+                            
+                            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                              {matchingFilas.map((f) => (
+                                <div 
+                                  key={f}
+                                  className="flex items-center justify-between p-2.5 rounded-lg border border-[var(--border-color)]/80 bg-[var(--modal-bg)] hover:border-[#89b4fa]/30 transition group gap-2 shadow-sm"
+                                >
+                                  <span className="text-xs text-[var(--text-main)] font-semibold truncate leading-none py-1">
+                                    {f}
+                                  </span>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(f);
+                                      showToast(`Fila "${f}" copiada!`);
+                                    }}
+                                    className="p-1.5 rounded bg-[var(--border-color)] text-[var(--status-text)] hover:text-[var(--text-main)] hover:bg-[var(--border-color)]/60 transition cursor-pointer shrink-0"
+                                    title="Copiar nome da fila"
+                                  >
+                                    <Copy size={11} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
           ) : activeView === 'relatorio' ? (
             <RelatorioView userEmail={userEmail} userRole={getLoggedUserRole()} openEditProfile={openEditProfile} />
           ) : (
@@ -3191,16 +3645,7 @@ export default function Home() {
               <Folder size={13} className="text-[#a6e3a1]" /> Kit Chamados <span className="opacity-70">({kits.length})</span>
             </button>
 
-            <button
-              onClick={() => {
-                setRefTableSearchQuery('');
-                setModalReferenceTablesOpen(true);
-              }}
-              className="px-3 py-1.5 rounded bg-[var(--btn-historico-bg)] text-[var(--btn-historico-text)] text-xs font-semibold flex items-center gap-1 transition hover:brightness-105"
-              title="Visualizar tabelas de referência (Cliente, Catálogo e Fila)"
-            >
-              <Table size={13} className="text-[#89b4fa]" /> Tabelas de Apoio
-            </button>
+
 
             {/* Status Indicator */}
             <div className="ml-auto flex items-center gap-2">
@@ -3320,9 +3765,9 @@ export default function Home() {
                     item.toLowerCase().includes(catQuery)
                   );
 
-                  const isFilaPerfectMatch = FILAS_CATEGORIAS.some(cat => cat.filas.some(f => f === row.fila));
+                  const isFilaPerfectMatch = filasCategorias.some(cat => cat.filas.some(f => f === row.fila));
                   const filaQuery = isFilaPerfectMatch ? '' : (row.fila || '').toLowerCase().trim();
-                  const matchingFilas = FILAS_CATEGORIAS.map(cat => {
+                  const matchingFilas = filasCategorias.map(cat => {
                     const matching = cat.filas.filter(f => 
                       !filaQuery ||
                       f.toLowerCase().includes(filaQuery)
@@ -3785,7 +4230,7 @@ export default function Home() {
       </datalist>
 
       <datalist id="filas-dl">
-        {FILAS_CATEGORIAS.map((cat) =>
+        {filasCategorias.map((cat) =>
           cat.filas.map((f) => (
             <option key={f} value={f} />
           ))
@@ -4511,7 +4956,7 @@ export default function Home() {
 
       {/* ── Modal: Tabelas de Apoio (Cliente, Catálogo, Fila) ── */}
       <AnimatePresence>
-        {modalReferenceTablesOpen && (
+        {false && (
           <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[110] px-4 py-6">
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
@@ -4543,7 +4988,7 @@ export default function Home() {
                   {[
                     { id: 'clientes', label: 'Clientes', count: clientList.length },
                     { id: 'catalogos', label: 'Catálogo de Serviços', count: catalogList.length },
-                    { id: 'filas', label: 'Filas de Atendimento', count: FILAS_CATEGORIAS.reduce((acc, curr) => acc + curr.filas.length, 0) }
+                    { id: 'filas', label: 'Filas de Atendimento', count: filasCategorias.reduce((acc, curr) => acc + curr.filas.length, 0) }
                   ].map((tab) => (
                     <button
                       key={tab.id}
@@ -4731,7 +5176,7 @@ export default function Home() {
                 {/* TAB: FILAS */}
                 {refTableActiveTab === 'filas' && (
                   <div className="flex flex-col gap-6">
-                    {FILAS_CATEGORIAS.map((cat) => {
+                    {filasCategorias.map((cat) => {
                       const matchingFilas = cat.filas.filter(f => f.toLowerCase().includes(refTableSearchQuery.toLowerCase().trim()));
                       if (matchingFilas.length === 0) return null;
 
