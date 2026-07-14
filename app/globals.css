@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+:root {
+  /* Dark Theme (Default/Catppuccin) */
+  --bg-body: #1e1e2e;
+  --text-main: #cdd6f4;
+  --bg-header: #181825;
+  --border-color: #313244;
+  --bg-badge: #313244;
+  --text-link: #f38ba8;
+  --bg-toolbar: #181825;
+  
+  --btn-executar-bg: #a6e3a1;
+  --btn-executar-text: #1e1e2e;
+  --btn-cancelar-bg: #f38ba8;
+  --btn-cancelar-text: #1e1e2e;
+  --btn-add-bg: #313244;
+  --btn-add-text: #a6e3a1;
+  --btn-ghost-bg: #313244;
+  --btn-ghost-text: #cdd6f4;
+  --btn-historico-bg: #313244;
+  --btn-historico-text: #89dceb;
+  
+  --status-bg: #313244;
+  --status-text: #6c7086;
+  --status-run-bg: #1e3a2e;
+  --status-run-text: #a6e3a1;
+  --status-err-bg: #3a1020;
+  --status-err-text: #f38ba8;
+  
+  --table-th-bg: #181825;
+  --table-th-text: #89b4fa;
+  --table-th-req: #f38ba8;
+  --table-tr-even: #1a1a2a;
+  --table-tr-hover: #252535;
+  --table-td-num: #6c7086;
+  
+  --input-bg-focus: #1e1e2e;
+  --input-border-focus: #89b4fa;
+  --input-invalid-border: #f38ba8;
+  --input-invalid-bg: #2a1a1e;
+  
+  --btn-desc-bg: #313244;
+  --btn-desc-filled: #a6e3a1;
+  
+  --btn-action: #45475a;
+  --btn-remove-hover: #f38ba8;
+  --btn-dup-hover: #89b4fa;
+  
+  --log-bg: #11111b;
+  --log-title: #6c7086;
+  --log-info: #a6e3a1;
+  --log-warn: #f9e2af;
+  --log-err: #f38ba8;
+  --log-sys: #89b4fa;
+  
+  --modal-bg: #181825;
+  --modal-backdrop: rgba(0,0,0,0.65);
+  --modal-input-bg: #313244;
+  --modal-input-border: #45475a;
+  --modal-hint: #6c7086;
+  
+  --hist-tr-hover: #1e1e2e;
+  --badge-ok: #a6e3a1;
+  --badge-erro: #f38ba8;
+  
+  --toast-bg: #313244;
+  --toast-text: #cdd6f4;
+  
+  --btn-anx-bg: #313244;
+  --btn-anx-text: #6c7086;
+  --btn-anx-filled: #a6e3a1;
+  --btn-anx-filled-border: #1e3a2e;
+}
+
+[data-theme="light"] {
+  --bg-body: #f4f5f7;
+  --text-main: #172b4d;
+  --bg-header: #ffffff;
+  --border-color: #dfe1e6;
+  --bg-badge: #ebecf0;
+  --text-link: #de350b;
+  --bg-toolbar: #ffffff;
+  
+  --btn-executar-bg: #36b37e;
+  --btn-executar-text: #ffffff;
+  --btn-cancelar-bg: #ff5630;
+  --btn-cancelar-text: #ffffff;
+  --btn-add-bg: #ebecf0;
+  --btn-add-text: #00875a;
+  --btn-ghost-bg: #ebecf0;
+  --btn-ghost-text: #42526e;
+  --btn-historico-bg: #ebecf0;
+  --btn-historico-text: #0052cc;
+  
+  --status-bg: #ebecf0;
+  --status-text: #5e6c84;
+  --status-run-bg: #e3fcef;
+  --status-run-text: #006644;
+  --status-err-bg: #ffebe6;
+  --status-err-text: #bf2600;
+  
+  --table-th-bg: #fafbfc;
+  --table-th-text: #0052cc;
+  --table-th-req: #de350b;
+  --table-tr-even: #ffffff;
+  --table-tr-hover: #f4f5f7;
+  --table-td-num: #5e6c84;
+  
+  --input-bg-focus: #ffffff;
+  --input-border-focus: #4c9aff;
+  --input-invalid-border: #ff5630;
+  --input-invalid-bg: #ffebe6;
+  
+  --btn-desc-bg: #ebecf0;
+  --btn-desc-filled: #00875a;
+  
+  --btn-action: #a5adba;
+  --btn-remove-hover: #ff5630;
+  --btn-dup-hover: #0052cc;
+  
+  --log-bg: #ffffff;
+  --log-title: #5e6c84;
+  --log-info: #00875a;
+  --log-warn: #ff991f;
+  --log-err: #de350b;
+  --log-sys: #0052cc;
+  
+  --modal-bg: #ffffff;
+  --modal-backdrop: rgba(9, 30, 66, 0.54);
+  --modal-input-bg: #ffffff;
+  --modal-input-border: #dfe1e6;
+  --modal-hint: #5e6c84;
+  
+  --hist-tr-hover: #f4f5f7;
+  --badge-ok: #00875a;
+  --badge-erro: #de350b;
+  
+  --toast-bg: #172b4d;
+  --toast-text: #ffffff;
+  
+  --btn-anx-bg: #ebecf0;
+  --btn-anx-text: #5e6c84;
+  --btn-anx-filled: #00875a;
+  --btn-anx-filled-border: #e3fcef;
+}
+
+/* Custom scrollbar to match our elegant style */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-body);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--btn-action);
+}

@@ -1,0 +1,6 @@
+{
+  "name": "FormCreator — Gerador de Chamados Automáticos",
+  "description": "Gerador de chamados automático e inteligente integrado à API do GLPI com suporte a múltiplos perfis de atendimento (Padrão, UBS e Manaus).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
