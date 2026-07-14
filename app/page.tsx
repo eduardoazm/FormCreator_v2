@@ -3278,20 +3278,28 @@ export default function Home() {
                   const isCelInvalid = row.invalidFields?.includes('celular');
 
                   // Filter lists for custom inline autocompletes
-                  const cliQuery = (row.cliente || '').toLowerCase().trim();
+                  // Smart Autocomplete: If the current field value perfectly matches an option, we show all options.
+                  // Otherwise, we filter by the text they have typed.
+                  const isCliPerfectMatch = clientList.some(c => c.nome_completo === row.cliente || c.abreviatura === row.cliente);
+                  const cliQuery = isCliPerfectMatch ? '' : (row.cliente || '').toLowerCase().trim();
                   const matchingClients = clientList.filter(c => 
+                    !cliQuery ||
                     c.abreviatura.toLowerCase().includes(cliQuery) || 
                     c.nome_completo.toLowerCase().includes(cliQuery)
-                  ).slice(0, 10);
+                  );
 
-                  const catQuery = (row.catalogo || '').toLowerCase().trim();
+                  const isCatPerfectMatch = catalogList.some(cat => cat === row.catalogo);
+                  const catQuery = isCatPerfectMatch ? '' : (row.catalogo || '').toLowerCase().trim();
                   const matchingCatalogs = catalogList.filter(item => 
+                    !catQuery ||
                     item.toLowerCase().includes(catQuery)
-                  ).slice(0, 10);
+                  );
 
-                  const filaQuery = (row.fila || '').toLowerCase().trim();
+                  const isFilaPerfectMatch = FILAS_CATEGORIAS.some(cat => cat.filas.some(f => f === row.fila));
+                  const filaQuery = isFilaPerfectMatch ? '' : (row.fila || '').toLowerCase().trim();
                   const matchingFilas = FILAS_CATEGORIAS.map(cat => {
                     const matching = cat.filas.filter(f => 
+                      !filaQuery ||
                       f.toLowerCase().includes(filaQuery)
                     );
                     return {
